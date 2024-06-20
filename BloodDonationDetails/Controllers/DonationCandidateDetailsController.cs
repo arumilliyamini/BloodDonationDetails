@@ -6,6 +6,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BloodDonationDetails.Models;
+using System.Xml.Serialization;
+using System.Text.Json;
+using System.Xml.Linq;
+using BloodDonationDetails.Models;
 
 namespace BloodDonationDetails.Controllers
 {
@@ -24,6 +28,7 @@ namespace BloodDonationDetails.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<DonationCandidateDetails>>> GetcandidateDetails()
         {
+
             return await _context.candidateDetails.ToListAsync();
         }
 
@@ -37,8 +42,59 @@ namespace BloodDonationDetails.Controllers
             {
                 return NotFound();
             }
+            // Convert the object to JSON
+            var jsonString = JsonSerializer.Serialize(donationCandidateDetails);
 
-            return donationCandidateDetails;
+            // Convert JSON to XML
+            var xmlString = JsonToXml(jsonString);
+
+            return Content(xmlString, "application/xml");
+
+            // return donationCandidateDetails;
+        }
+
+        private string JsonToXml(string json)
+        {
+            var doc = JsonDocument.Parse(json);
+            var root = new XElement("Root", ConvertJsonToXml(doc.RootElement));
+            return root.ToString();
+        }
+        private XElement ConvertJsonToXml(JsonElement jsonElement)
+        {
+            switch (jsonElement.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    var obj = new XElement("Object");
+                    foreach (var property in jsonElement.EnumerateObject())
+                    {
+                        obj.Add(new XElement(property.Name, ConvertJsonToXml(property.Value)));
+                    }
+                    return obj;
+
+                case JsonValueKind.Array:
+                    var array = new XElement("Array");
+                    foreach (var item in jsonElement.EnumerateArray())
+                    {
+                        array.Add(ConvertJsonToXml(item));
+                    }
+                    return array;
+
+                case JsonValueKind.String:
+                    return new XElement("String", jsonElement.GetString());
+
+                case JsonValueKind.Number:
+                    return new XElement("Number", jsonElement.GetDecimal());
+
+                case JsonValueKind.True:
+                case JsonValueKind.False:
+                    return new XElement("Boolean", jsonElement.GetBoolean());
+
+                case JsonValueKind.Null:
+                    return new XElement("Null");
+
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
 
         // PUT: api/DonationCandidateDetails/5
@@ -105,3 +161,4 @@ namespace BloodDonationDetails.Controllers
         }
     }
 }
+
